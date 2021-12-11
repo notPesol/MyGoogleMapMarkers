@@ -37,6 +37,8 @@ public class MainActivity extends AppCompatActivity {
     private GoogleApiClient mClient;
     private Geocoder mGeocoder;
 
+    private boolean isMoved = false;
+
     private TextView mTitle, mDetail;
 
     private final GoogleApiClient.ConnectionCallbacks callbacks = new GoogleApiClient.ConnectionCallbacks() {
@@ -75,44 +77,7 @@ public class MainActivity extends AppCompatActivity {
     private final LocationListener locationListener = new LocationListener() {
         @Override
         public void onLocationChanged(@NonNull Location location) {
-            mMap.clear();
-
-            double lat = location.getLatitude();
-            double lon = location.getLongitude();
-
-            LatLng latLng = new LatLng(lat, lon);
-
-            List<Address> addresses = null;
-            try {
-                addresses = mGeocoder.getFromLocation(lat, lon, 1);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            if (addresses.isEmpty()) {
-                mMap.addMarker(new MarkerOptions()
-                        .title("Unknown")
-                        .position(latLng)
-                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.baseline_accessibility_new_white_20)));
-            } else {
-                Address address1 = addresses.get(0);
-                String featureName = address1.getFeatureName();
-                int numLine = address1.getMaxAddressLineIndex();
-                String detail = "";
-                for (int i = 0; i < numLine + 1; i++) {
-                    detail += address1.getAddressLine(i);
-                }
-
-                MarkerOptions markerOptions = new MarkerOptions()
-                        .snippet(detail)
-                        .title(featureName)
-                        .position(latLng)
-                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.baseline_accessibility_new_white_20));
-                mMap.addMarker(markerOptions);
-
-                mTitle.setText(featureName);
-                mDetail.setText(detail);
-            }
+            setMyMarker(location);
         }
     };
 
@@ -138,56 +103,138 @@ public class MainActivity extends AppCompatActivity {
         );
         if (mapFragment != null) {
             mapFragment.getMapAsync(new OnMapReadyCallback() {
-                @SuppressLint("MissingPermission")
                 @Override
                 public void onMapReady(@NonNull GoogleMap googleMap) {
                     mMap = googleMap;
-                    mMap.setMyLocationEnabled(true);
-                    mMap.setBuildingsEnabled(true);
-                    mMap.setIndoorEnabled(true);
-                    mMap.setTrafficEnabled(true);
-
-                    CameraPosition cameraPosition = mMap.getCameraPosition();
-                    LatLng latLng = cameraPosition.target;
-
-                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 14));
-
-                    List<Address> addressList = null;
-                    try {
-                        addressList = mGeocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    if (addressList.isEmpty()) {
-                        MarkerOptions markerOptions = new MarkerOptions()
-                                .position(latLng)
-                                .title("Unknown");
-                        mMap.addMarker(markerOptions);
-                        return;
-                    }
-                    Address address1 = addressList.get(0);
-                    String featureName = address1.getFeatureName();
-                    int numLine = address1.getMaxAddressLineIndex();
-                    String detail = "";
-                    for (int i = 0; i < numLine + 1; i++) {
-                        detail += address1.getAddressLine(i);
-                    }
-
-                    MarkerOptions markerOptions = new MarkerOptions()
-                            .position(latLng)
-                            .title(featureName)
-                            .snippet(detail);
-                    mMap.addMarker(markerOptions);
+                    setMap();
 
                     mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
                         @Override
                         public void onMapLongClick(@NonNull LatLng latLng) {
-
+                            addMarker(latLng);
                         }
                     });
                 }
             });
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void setMap() {
+        mMap.setMyLocationEnabled(true);
+        mMap.setBuildingsEnabled(true);
+        mMap.setIndoorEnabled(true);
+        mMap.setTrafficEnabled(true);
+
+        CameraPosition cameraPosition = mMap.getCameraPosition();
+        LatLng latLng = cameraPosition.target;
+
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLng, 14));
+
+        List<Address> addressList = null;
+        try {
+            addressList = mGeocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        Address address1 = null;
+        String featureName = "";
+        String detail = "";
+        MarkerOptions markerOptions = new MarkerOptions()
+                .position(latLng);
+        if (addressList.isEmpty()) {
+            markerOptions.title("Unknown");
+        } else {
+            address1 = addressList.get(0);
+            featureName = address1.getFeatureName();
+            int numLine = address1.getMaxAddressLineIndex();
+            for (int i = 0; i < numLine + 1; i++) {
+                detail += address1.getAddressLine(i);
+            }
+            markerOptions
+                    .title(featureName)
+                    .snippet(detail);
+        }
+        mMap.addMarker(markerOptions);
+    }
+
+    private void setMyMarker(Location location) {
+
+        double lat = location.getLatitude();
+        double lon = location.getLongitude();
+
+        LatLng latLng = new LatLng(lat, lon);
+
+        if (!isMoved) {
+            CameraPosition position = new CameraPosition(latLng, 15, 0, 0);
+            mMap.moveCamera(CameraUpdateFactory.newCameraPosition(position));
+            isMoved = true;
+        }
+
+        List<Address> addresses = null;
+        try {
+            addresses = mGeocoder.getFromLocation(lat, lon, 1);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        if (addresses.isEmpty()) {
+            mMap.addMarker(new MarkerOptions()
+                    .title("Unknown")
+                    .position(latLng)
+                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.baseline_accessibility_new_white_20)));
+        } else {
+            Address address1 = addresses.get(0);
+            String featureName = address1.getFeatureName();
+            int numLine = address1.getMaxAddressLineIndex();
+            String detail = "";
+            for (int i = 0; i < numLine + 1; i++) {
+                detail += address1.getAddressLine(i);
+            }
+
+            MarkerOptions markerOptions = new MarkerOptions()
+                    .snippet(detail)
+                    .title(featureName)
+                    .position(latLng)
+                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.baseline_accessibility_new_white_20));
+            mMap.addMarker(markerOptions);
+        }
+    }
+
+    private void addMarker(LatLng latLng) {
+        mMap.clear();
+
+        List<Address> addresses = null;
+        try {
+            addresses = mGeocoder.getFromLocation(latLng.latitude, latLng.longitude, 1);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        BitmapDescriptor icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN);
+        MarkerOptions markerOptions1 = new MarkerOptions()
+                .position(latLng)
+                .icon(icon);
+
+        String featureName = "";
+        String detail = "";
+        if (addresses.isEmpty()) {
+            markerOptions1.title("Unknown");
+        } else {
+            Address address = addresses.get(0);
+            featureName = address.getFeatureName();
+            int numLine = address.getMaxAddressLineIndex();
+            for (int i = 0; i < numLine + 1; i++) {
+                detail += address.getAddressLine(i);
+            }
+            markerOptions1.title(featureName)
+                    .snippet(detail);
+        }
+
+        mMap.addMarker(markerOptions1);
+
+        mTitle.setText(featureName);
+        mDetail.setText(detail);
     }
 
 
